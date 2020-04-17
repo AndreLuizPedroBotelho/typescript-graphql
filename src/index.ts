@@ -4,25 +4,23 @@ import express from "express";
 
 import { ApolloServer } from "apollo-server-express";
 import { buildSchema } from "type-graphql";
-import { HelloWorldResolver } from "./resolvers/HelloWorldResolver";
-import { MovieResolver } from "./resolvers/MovieResolver";
 import { UserResolver } from "./resolvers/UserResolver";
-
 
 (async () => {
     const app = express();
+    const PORT = 4000;
 
     await createConnection();
 
     const apolloServer = new ApolloServer({
         schema: await buildSchema({
-            resolvers: [HelloWorldResolver, MovieResolver, UserResolver]
+            resolvers: [UserResolver]
         }),
         context: ({ req, res }) => ({ req, res })
     });
     apolloServer.applyMiddleware({ app, cors: false });
 
-    app.listen(4000, () => {
-        console.log("express server started");
+    app.listen(PORT, () => {
+        console.log(`🚀 Server ready at http://localhost:${PORT}${apolloServer.graphqlPath}`)
     });
 })();

@@ -1,48 +1,25 @@
+import { UserUpdateInput } from './../input/UserUpdateInput';
+import { UserInput } from './../input/UserInput';
 import {
   Resolver,
   Mutation,
   Arg,
   Int,
   Query,
-  InputType,
   ObjectType,
   Field,
   UseMiddleware
 } from "type-graphql";
+
 import { User } from "../entity/User";
-
+import { Not } from "typeorm";
 import { sign } from 'jsonwebtoken'
-import { isAuth } from "../isAuth";
-
+import { isAuth } from "../middleware/isAuth";
 
 @ObjectType()
 class LoginResponse {
   @Field()
   accessToken: string;
-}
-
-@InputType()
-class UserInput {
-  @Field()
-  name: string;
-
-  @Field()
-  email: string;
-
-  @Field()
-  password: string;
-}
-
-@InputType()
-class UserUpdateInput {
-  @Field(() => String, { nullable: true })
-  name?: string;
-
-  @Field(() => String, { nullable: true })
-  email?: string;
-
-  @Field(() => String, { nullable: true })
-  password?: string;
 }
 
 @Resolver()
@@ -57,21 +34,36 @@ export class UserResolver {
 
     if (userValid) {
       throw new Error('User already exist')
-
     }
 
     const user = await User.create({ name, email, password }).save();
     return user;
   }
 
-  @Mutation(() => Boolean)
+  @Mutation(() => Int)
   @UseMiddleware(isAuth)
   async updateUser(
     @Arg("id", () => Int) id: number,
-    @Arg("input", () => UserUpdateInput) input: UserUpdateInput
+    @Arg("data", () => UserUpdateInput) data: UserUpdateInput
   ) {
-    await User.update({ id }, input);
-    return true;
+    const userValid = await User.findOne({
+      where: {
+        email: data.email,
+        id: Not(id)
+      }
+    });
+
+    if (userValid) {
+      throw new Error('User already exist')
+    }
+
+    const { affected } = await User.update({ id }, data);
+
+    if (affected === 0) {
+      throw new Error('User don\'t exist')
+    }
+
+    return affected;
   }
 
   @Mutation(() => LoginResponse)
@@ -103,22 +95,26 @@ export class UserResolver {
     };
   }
 
-  @Mutation(() => Boolean)
+  @Mutation(() => Int)
   @UseMiddleware(isAuth)
   async deleteUser(@Arg("id", () => Int) id: number) {
-    await User.delete({ id });
-    return true;
+    const { affected } = await User.delete({ id });
+    if (affected === 0) {
+      throw new Error('User don\'t exist')
+    }
+
+    return affected;
   }
 
   @Query(() => [User])
   @UseMiddleware(isAuth)
-  Users() {
+  listUsers() {
     return User.find();
   }
 
   @Query(() => User)
   @UseMiddleware(isAuth)
-  async User(
+  async listUser(
     @Arg("id", () => Int) id: number) {
     return User.findOne(id);
   }
